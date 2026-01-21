@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "k8s-mcp": {
+      "command": "node",
+      "args": ["/Users/himang10/mydev/digital-devplace/mcp-server/mcp-server-kubernetes/dist/index.js"]
+    },
+    "user-mcp": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "http://localhost:8080/mcp"]
+    }
+  }
+}

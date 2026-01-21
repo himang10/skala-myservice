@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  name: mcp-myfirst-ingress
+  namespace: skala-practice
+spec:
+  ingressClassName: public-nginx
+  rules:
+  - host: mcp-ingress.skala25a.project.skala-ai.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: mcp-custom-jenkins
+            port:
+              number: 8080
+        path: /jenkins
+        pathType: Prefix
+      - backend:
+          service:
+            name: mcp-myfirst-api-server
+            port:
+              number: 8080
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - 'mcp-ingress.skala25a.project.skala-ai.com'
+    secretName: mcp-ingress-project-tls-cert
+

@@ -1,0 +1,39 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  name: ${USER_NAME}-myfirst-ingress
+  namespace: ${NAMESPACE}
+spec:
+  ingressClassName: public-nginx
+  rules:
+  - host: ${USER_NAME}-ingress.skala25a.project.skala-ai.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: ${USER_NAME}-mcp-client
+            port:
+              number: 8080
+        path: /api/chat
+        pathType: Prefix
+      - backend:
+          service:
+            name: ${USER_NAME}-spring-mcp-server
+            port:
+              number: 8080
+        path: /api
+        pathType: Prefix
+      - backend:
+          service:
+            name: ${USER_NAME}-frontend
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+  tls:
+  - hosts:
+    - '${USER_NAME}-ingress.skala25a.project.skala-ai.com'
+    secretName: ${USER_NAME}-ingress-project-tls-cert
+

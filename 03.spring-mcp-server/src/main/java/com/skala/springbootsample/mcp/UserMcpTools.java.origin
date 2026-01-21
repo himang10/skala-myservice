@@ -1,0 +1,308 @@
+package com.skala.springbootsample.mcp;
+
+import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.stereotype.Component;
+import com.skala.springbootsample.service.UserService;
+import com.skala.springbootsample.service.RegionService;
+import com.skala.springbootsample.domain.User;
+import com.skala.springbootsample.domain.Region;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+import java.util.Optional;
+import java.util.List;
+
+/**
+ * Spring AI MCP Tools - 사용자 및 지역 관리 도구들
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class UserMcpTools {
+
+    private final UserService userService;
+    private final RegionService regionService;
+
+    @Tool(description = "사용자 목록을 조회합니다. 이름으로 필터링할 수 있습니다.")
+    public String getUsers(String name) {
+        log.info("MCP Tool 호출: getUsers, name={}", name);
+
+        try {
+            List<User> users = userService.findAll(Optional.ofNullable(name));
+
+            if (users.isEmpty()) {
+                return name != null ?
+                        "'" + name + "'과 일치하는 사용자가 없습니다." :
+                        "등록된 사용자가 없습니다.";
+            }
+
+            StringBuilder result = new StringBuilder();
+            result.append("조회된 사용자: ").append(users.size()).append("명\n\n");
+
+            for (User user : users) {
+                result.append("- ID: ").append(user.getId())
+                        .append(", 이름: ").append(user.getName())
+                        .append(", 이메일: ").append(user.getEmail())
+                        .append(", 지역: ").append(user.getRegion().getName())
+                        .append("\n");
+            }
+
+            return result.toString();
+        } catch (Exception e) {
+            log.error("사용자 조회 중 오류", e);
+            return "사용자 조회 중 오류 발생: " + e.getMessage();
+        }
+    }
+
+    @Tool(description = "특정 ID의 사용자 상세 정보를 조회합니다.")
+    public String getUserById(long userId) {
+        log.info("MCP Tool 호출: getUserById, userId={}", userId);
+
+        try {
+            Optional<User> userOpt = userService.findById(userId);
+
+            if (userOpt.isEmpty()) {
+                return "ID " + userId + "인 사용자를 찾을 수 없습니다.";
+            }
+
+            User user = userOpt.get();
+            return String.format("""
+                사용자 정보:
+                - ID: %d
+                - 이름: %s
+                - 이메일: %s
+                - 지역: %s (ID: %d)
+                """,
+                    user.getId(), user.getName(), user.getEmail(),
+                    user.getRegion().getName(), user.getRegion().getId());
+
+        } catch (Exception e) {
+            log.error("사용자 조회 중 오류", e);
+            return "사용자 조회 중 오류 발생: " + e.getMessage();
+        }
+    }
+
+    @Tool(description = "지역 목록을 조회합니다.")
+    public String getRegions() {
+        log.info("MCP Tool 호출: getRegions");
+
+        try {
+            List<Region> regions = regionService.findAll();
+
+            if (regions.isEmpty()) {
+                return "등록된 지역이 없습니다.";
+            }
+
+            StringBuilder result = new StringBuilder();
+            result.append("등록된 지역: ").append(regions.size()).append("개\n\n");
+
+            for (Region region : regions) {
+                result.append("- ID: ").append(region.getId())
+                        .append(", 이름: ").append(region.getName())
+                        .append("\n");
+            }
+
+            return result.toString();
+        } catch (Exception e) {
+            log.error("지역 조회 중 오류", e);
+            return "지역 조회 중 오류 발생: " + e.getMessage();
+        }
+    }
+
+    @Tool(description = "특정 지역의 사용자들을 조회합니다.")
+    public String getUsersByRegion(long regionId) {
+        log.info("MCP Tool 호출: getUsersByRegion, regionId={}", regionId);
+
+        try {
+            // 지역이 존재하는지 먼저 확인
+            Optional<Region> regionOpt = regionService.findById(regionId);
+            if (regionOpt.isEmpty()) {
+                return "ID " + regionId + "인 지역을 찾을 수 없습니다.";
+            }
+
+            List<User> users = userService.findByRegionId(regionId);
+            Region region = regionOpt.get();
+
+            if (users.isEmpty()) {
+                return region.getName() + " 지역에 등록된 사용자가 없습니다.";
+            }
+
+            StringBuilder result = new StringBuilder();
+            result.append(region.getName()).append(" 지역 사용자: ").append(users.size()).append("명\n\n");
+
+            for (User user : users) {
+                result.append("- ").append(user.getName())
+                        .append(" (").append(user.getEmail()).append(")")
+                        .append("\n");
+            }
+
+            return result.toString();
+        } catch (Exception e) {
+            log.error("지역별 사용자 조회 중 오류", e);
+            return "지역별 사용자 조회 중 오류 발생: " + e.getMessage();
+        }
+    }
+
+    @Tool(description = "새 사용자를 생성합니다.")
+    public String createUser(String name, String email, long regionId) {
+        log.info("MCP Tool 호출: createUser, name={}, email={}, regionId={}", name, email, regionId);
+
+        try {
+            // 입력 검증
+            if (name == null || name.trim().isEmpty()) {
+                return "사용자 이름은 필수입니다.";
+            }
+            if (email == null || email.trim().isEmpty()) {
+                return "이메일은 필수입니다.";
+            }
+
+            // 지역 확인
+            Optional<Region> regionOpt = regionService.findById(regionId);
+            if (regionOpt.isEmpty()) {
+                return "ID " + regionId + "인 지역을 찾을 수 없습니다.";
+            }
+
+            Region region = regionOpt.get();
+            User user = new User(name.trim(), email.trim(), region);
+            User created = userService.create(user);
+
+            return String.format("""
+                사용자가 성공적으로 생성되었습니다:
+                - ID: %d
+                - 이름: %s
+                - 이메일: %s
+                - 지역: %s
+                """,
+                    created.getId(), created.getName(), created.getEmail(), created.getRegion().getName());
+
+        } catch (IllegalArgumentException e) {
+            log.warn("사용자 생성 실패: {}", e.getMessage());
+            return "사용자 생성 실패: " + e.getMessage();
+        } catch (Exception e) {
+            log.error("사용자 생성 중 오류", e);
+            return "사용자 생성 중 오류 발생: " + e.getMessage();
+        }
+    }
+
+    @Tool(description = "새 지역을 생성합니다.")
+    public String createRegion(String regionName) {
+        log.info("MCP Tool 호출: createRegion, regionName={}", regionName);
+
+        try {
+            if (regionName == null || regionName.trim().isEmpty()) {
+                return "지역 이름은 필수입니다.";
+            }
+
+            Region region = new Region(regionName.trim());
+            Region created = regionService.create(region);
+
+            return String.format("지역이 성공적으로 생성되었습니다: %s (ID: %d)",
+                    created.getName(), created.getId());
+
+        } catch (IllegalArgumentException e) {
+            log.warn("지역 생성 실패: {}", e.getMessage());
+            return "지역 생성 실패: " + e.getMessage();
+        } catch (Exception e) {
+            log.error("지역 생성 중 오류", e);
+            return "지역 생성 중 오류 발생: " + e.getMessage();
+        }
+    }
+
+    @Tool(description = "사용자 정보를 수정합니다.")
+    public String updateUser(long userId, String name, String email, Long regionId) {
+        log.info("MCP Tool 호출: updateUser, userId={}, name={}, email={}, regionId={}",
+                userId, name, email, regionId);
+
+        try {
+            // 사용자 존재 확인
+            Optional<User> userOpt = userService.findById(userId);
+            if (userOpt.isEmpty()) {
+                return "ID " + userId + "인 사용자를 찾을 수 없습니다.";
+            }
+
+            User updateUser = new User();
+            updateUser.setName(name != null ? name.trim() : userOpt.get().getName());
+            updateUser.setEmail(email != null ? email.trim() : userOpt.get().getEmail());
+
+            // 지역 정보 설정
+            if (regionId != null) {
+                Optional<Region> regionOpt = regionService.findById(regionId);
+                if (regionOpt.isEmpty()) {
+                    return "ID " + regionId + "인 지역을 찾을 수 없습니다.";
+                }
+                updateUser.setRegion(regionOpt.get());
+            } else {
+                updateUser.setRegion(userOpt.get().getRegion());
+            }
+
+            Optional<User> updatedOpt = userService.update(userId, updateUser);
+            if (updatedOpt.isEmpty()) {
+                return "사용자 수정에 실패했습니다.";
+            }
+
+            User updated = updatedOpt.get();
+            return String.format("""
+                사용자가 성공적으로 수정되었습니다:
+                - ID: %d
+                - 이름: %s
+                - 이메일: %s
+                - 지역: %s
+                """,
+                    updated.getId(), updated.getName(), updated.getEmail(), updated.getRegion().getName());
+
+        } catch (IllegalArgumentException e) {
+            log.warn("사용자 수정 실패: {}", e.getMessage());
+            return "사용자 수정 실패: " + e.getMessage();
+        } catch (Exception e) {
+            log.error("사용자 수정 중 오류", e);
+            return "사용자 수정 중 오류 발생: " + e.getMessage();
+        }
+    }
+
+    @Tool(description = "사용자를 삭제합니다.")
+    public String deleteUser(long userId) {
+        log.info("MCP Tool 호출: deleteUser, userId={}", userId);
+
+        try {
+            // 사용자 존재 확인
+            Optional<User> userOpt = userService.findById(userId);
+            if (userOpt.isEmpty()) {
+                return "ID " + userId + "인 사용자를 찾을 수 없습니다.";
+            }
+
+            boolean deleted = userService.delete(userId);
+            if (deleted) {
+                return "사용자가 성공적으로 삭제되었습니다: " + userOpt.get().getName();
+            } else {
+                return "사용자 삭제에 실패했습니다.";
+            }
+
+        } catch (Exception e) {
+            log.error("사용자 삭제 중 오류", e);
+            return "사용자 삭제 중 오류 발생: " + e.getMessage();
+        }
+    }
+
+    @Tool(description = "시스템 상태 정보를 조회합니다.")
+    public String getSystemStatus() {
+        log.info("MCP Tool 호출: getSystemStatus");
+
+        try {
+            long userCount = userService.findAll(Optional.empty()).size();
+            long regionCount = regionService.findAll().size();
+
+            return String.format("""
+                시스템 상태:
+                - 총 사용자 수: %d명
+                - 총 지역 수: %d개
+                - 서버 상태: 정상
+                - 현재 시간: %s
+                """,
+                    userCount, regionCount, java.time.LocalDateTime.now());
+
+        } catch (Exception e) {
+            log.error("시스템 상태 조회 중 오류", e);
+            return "시스템 상태 조회 중 오류 발생: " + e.getMessage();
+        }
+    }
+}

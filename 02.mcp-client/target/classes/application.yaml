@@ -1,0 +1,62 @@
+spring:
+  output:
+    ansi:
+      enabled: ALWAYS
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 10MB
+      max-request-size: 15MB
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          no-cache: true
+          no-store: true
+          must-revalidate: true
+  ai:
+    openai:
+      api-key: ${OPEN_AI_KEY}
+      chat:
+        options:
+          model: gpt-4o-mini
+    mcp:
+      client:
+        type: SYNC
+        # Streamable HTTP 서버
+        streamable-http:
+          connections:
+            spring-mcp-server:
+              url: http://spring-mcp-server:8080
+              endpoint: /mcp
+
+server:
+  port: 8080
+
+logging:
+  pattern:
+    console: '%clr(%-5level){green} %clr(%logger.%M\(\)){cyan}: %msg%n'
+  level:
+    '[io.modelcontextprotocol]': DEBUG
+    '[org.springframework.ai]': DEBUG
+    '[org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor]': DEBUG
+
+management:
+  server:
+    port: 8080 # Actuator 포트 설정
+  endpoints:
+    web:
+      exposure:
+        include: "*" # Prometheus endpoint 노출
+  endpoint:
+    health:
+      probes:
+        enabled: true # LivenessState, ReadinessState 활성화
+  health:
+    livenessState:
+        enabled: true # LivenessState 활성화
+    readinessState:
+        enabled: true # ReadinessState 활성화
+  metrics:
+    enable:
+      all: true # 모든 기본 메트릭 활성화

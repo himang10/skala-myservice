@@ -1,0 +1,52 @@
+spring:
+  profiles:
+    default: local
+  ai:
+    mcp:
+      server:
+        name: user-mcp
+        version: 1.0.0
+        description: "Spring Boot 기반 사용자 및 지역 관리 MCP 서버"
+        type: SYNC             # 또는 ASYNC
+        protocol: STREAMABLE   # (SSE 대신 HTTP(S))
+        streamable-http:
+          mcp-endpoint: /mcp   # 기본 MCP 엔드포인트
+          message-endpoint: /mcp/message
+          keep-alive-interval: 120s    # 선택적, keep-alive 헤더 주기 설정
+
+logging:
+  level:
+    root: INFO
+    '[org.hibernate.SQL]': DEBUG
+    '[org.hibernate.type.descriptor.sql.BasicBinder]': TRACE
+springdoc:
+  swagger-ui:
+    path: /swagger/swagger-ui # Swagger UI 접속 경로 변경
+  api-docs:
+    path: /swagger/swagger-docs
+
+management:
+  server:
+    port: 8080 # Actuator 포트 설정
+  endpoints:
+    web:
+      exposure:
+        include: "*" # Prometheus endpoint 노출
+  endpoint:
+    health:
+      probes:
+        enabled: true # LivenessState, ReadinessState 활성화
+  health:
+    livenessState:
+        enabled: true # LivenessState 활성화
+    readinessState:
+        enabled: true # ReadinessState 활성화
+  metrics:
+    enable:
+      all: true # 모든 기본 메트릭 활성화
+
+weather:
+  api:
+    key: ${WEATHER_API_KEY}
+    base-url: https://api.openweathermap.org
+    path: /data/2.5/weather
