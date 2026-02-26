@@ -1,0 +1,92 @@
+services:
+  # MariaDB 데이터베이스
+  mariadb:
+    image: bitnamilegacy/mariadb:11.4.6-debian-12-r0
+    environment:
+      - MARIADB_ROOT_PASSWORD=Skala25a!23$
+      - MARIADB_DATABASE=cloud
+      - MARIADB_USER=skala
+      - MARIADB_PASSWORD=Skala25a!23$
+      - MARIADB_REPLICATION_USER=skala
+      - MARIADB_REPLICATION_PASSWORD=Skala25a!23$
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb-data:/bitnami/mariadb
+      - ./04.mariadb/mariadb-custom.cnf:/opt/bitnami/mariadb/conf/my_custom.cnf:ro
+      - ./04.mariadb/setup_debezium_user.sql:/docker-entrypoint-initdb.d/setup_debezium_user.sql:ro
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pSkala25a!23$"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Spring Boot MCP Server
+  spring-mcp-server:
+    build:
+      context: ./03.spring-mcp-server
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=mariadb
+      - SPRING_DATASOURCE_URL=jdbc:mariadb://mariadb:3306/cloud?allowMultiQueries=true
+      - SPRING_DATASOURCE_USERNAME=skala
+      - SPRING_DATASOURCE_PASSWORD=Skala25a!23$
+      - WEATHER_API_KEY=${WEATHER_API_KEY}
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://spring-mcp-server:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  # MCP Client
+  mcp-client:
+    build:
+      context: ./02.mcp-client
+      dockerfile: Dockerfile
+    environment:
+      - OPEN_AI_KEY=${OPEN_AI_KEY}
+      - SPRING_PROFILES_ACTIVE=docker
+      - SPRING_AI_MCP_CLIENT_STREAMABLE_HTTP_CONNECTIONS_SPR_MCP_SERVER_URL=http://spring-mcp-server:8080
+    depends_on:
+      spring-mcp-server:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://mcp-client:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  # Frontend (Nginx)
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./01.frontend:/usr/share/nginx/html:ro
+      - ./01.frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - app-network
+    depends_on:
+      - mcp-client
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mariadb-data:
+    driver: local
